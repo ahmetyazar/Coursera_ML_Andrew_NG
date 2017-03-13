@@ -8,6 +8,7 @@ Created on Sat Mar 11 12:08:22 2017
 
 def gradient_descent():
     """function(a, b) -> list"""
-    print("gradient descent algorithm")
+    print("gradient descent algorithm.")
+    print("a new line")
 
 gradient_descent()
