@@ -195,6 +195,57 @@ def gradient_descent(X, y, theta, learning_rate, num_iters, cost_func='RSS',
     return theta, cost
 
 
+def plotData(X, y, ax1=None):
+    train_y = pd.DataFrame(y, columns=['y'])
+    train = pd.concat((pd.DataFrame(X), train_y), axis=1)
+    # scatter plot of admitted and non-admitted exam scores
+    X_admitted = train.ix[train['y'] == 1, train.columns != 'y'].get_values()
+    X_not_admitted = train.ix[train['y'] == 0,
+                              train.columns != 'y'].get_values()
+
+    if ax1 is None:
+        fig1 = plt.figure()
+        ax1 = fig1.add_subplot(111)
+    admitted = ax1.scatter(X_admitted[:, 0], X_admitted[:, 1],
+                           color='b', marker='+')
+    not_admitted = ax1.scatter(X_not_admitted[:, 0], X_not_admitted[:, 1],
+                               color='r', marker='o')
+    plt.xlabel('exam 1 score')
+    plt.ylabel('exam 2 score')
+    plt.legend([admitted, not_admitted], ['admitted', 'Not admitted'])
+
+
+def plotDecisionBoundary(theta, X, y):
+    """Plots the data points X and y into a new figure with
+        the decision boundary defined by theta
+
+    plotDecisionBoundary(theta, X,y) plots the data points with + for the
+    positive examples and o for the negative examples. X is assumed to be
+    a either
+    1) Mx3 matrix, where the first column is an all-ones column for the
+      intercept.
+    2) MxN, N>3 matrix, where the first column is all-ones
+    """
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+        
+    # Plot Data
+    plotData(X[:,1:3], y, ax1)
+
+    if X.shape[1] <= 3:
+        # Only need 2 points to define a line, so choose two endpoints
+        plot_x = np.array([np.min(X[:, 1])-0.1,  np.max(X[:, 1])+0.1])
+
+        # Calculate the decision boundary line
+        plot_y = (-1 / theta[2]) * (np.dot(theta[1], plot_x) + theta[0])
+
+        # Plot, and adjust axes for better viewing
+        ax1.plot(plot_x, plot_y)
+    
+    plt.show()
+
+
 if __name__ == "__main__":
 
     # load data
@@ -205,18 +256,7 @@ if __name__ == "__main__":
     y = train['y'].get_values()
     print('Shape of X,y = ({0},{1})'.format(X.shape, y.shape))
 
-    # scatter plot of admitted and non-admitted exam scores
-    X_admitted = train.ix[train['y'] == 1, train.columns != 'y'].get_values()
-    X_not_admitted = train.ix[train['y'] == 0,
-                              train.columns != 'y'].get_values()
-    admitted = plt.scatter(X_admitted[:, 0], X_admitted[:, 1],
-                           color='b', marker='+')
-    not_admitted = plt.scatter(X_not_admitted[:, 0], X_not_admitted[:, 1],
-                               color='r', marker='o')
-    plt.xlabel('exam 1 score')
-    plt.ylabel('exam 2 score')
-    plt.legend([admitted, not_admitted], ['admitted', 'Not admitted'])
-    plt.show()
+    plotData(X, y)
 
     # scale the input to zero mean and standard deviation of 1
     scaler = preprocessing.StandardScaler()
@@ -240,3 +280,10 @@ if __name__ == "__main__":
                                          args=(X_scaled, y))
 
     print('optimized theta with bfgs= {}'.format(theta_optimized))
+
+    # calculate minimum cost
+    print('minimum cost: {0}'.format(
+            _logisticCostFunc(theta_optimized, X_scaled, y)))
+
+    # plot data wiht a decision boundary
+    plotDecisionBoundary(theta_optimized, X_scaled, y)
