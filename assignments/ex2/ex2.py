@@ -10,21 +10,85 @@ import pandas as pd
 from scipy import linalg
 from sklearn import preprocessing
 from matplotlib import pyplot as plt
-import matplotlib as mpl
+from scipy import optimize
 
 
-def _RSS(X, y, theta):
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+
+def _RSS(theta, X, y):
     # number of training examples
     m = len(y)
+    theta = theta.reshape(-1, 1)
+    y = y.reshape(-1, 1)
 
     prediction = np.dot(X, theta)
-
     mean_error = prediction - y
 
     return 1/(2*m) * np.sum(np.power(mean_error, 2))
 
 
-def compute_cost(X, y, theta, method='RSS'):
+def _logisticCostFunc(theta, X, y):
+    """ compute cost for logistic regression
+
+        Parameters:
+        -----------
+        theta : ndarray, shape (n_features,)
+            Regression coefficients
+
+        X : {array-like}, shape (n_samples, n_features)
+            Training data. Should include intercept.
+
+        y : ndarray, shape (n_samples,)
+            Target values
+
+        Returns
+        -------
+        cost : float
+            cost evaluation using logistic cost function
+    """
+
+    # number of training examples
+    m = len(y)
+    y = y.reshape(-1, 1)
+    theta = theta.reshape(-1, 1)
+    J = 1/m * (np.dot(-y.T, np.log(sigmoid(np.dot(X, theta)))) -
+               np.dot((1-y.T), np.log(1-sigmoid(np.dot(X, theta)))))
+
+    return J
+
+
+def compute_gradient(theta, X, y):
+    """ Compute gradient. This will be passed to minimization functions
+
+        Parameters:
+        -----------
+        theta : ndarray, shape (n_features,)
+            Regression coefficients
+
+        X : {array-like}, shape (n_samples, n_features)
+            Training data. Should include intercept.
+
+        y : ndarray, shape (n_samples,)
+            Target values
+
+        method : cost calculation method, default to 'RSS'
+                Only RSS is supported for now
+
+        Returns
+        -------
+        cost : float
+    """
+    m = len(y)
+    y = y.reshape(-1, 1)
+    theta = theta.reshape(-1, 1)
+    grad = 1/m * np.dot(X.T, sigmoid(np.dot(X, theta)) - y)
+
+    return grad.ravel()
+
+
+def compute_cost(theta, X, y, method='RSS'):
     """ Compute cost to be used in gradient descent
 
         Parameters:
@@ -45,10 +109,13 @@ def compute_cost(X, y, theta, method='RSS'):
         -------
         cost : float
     """
-    if method != 'RSS':
-        raise ValueError("only 'RSS' method is supported.")
-
-    return _RSS(X, y, theta)
+    print("cost method is {0}".format(method))
+    if method == 'RSS':
+        return _RSS(theta, X, y)
+    elif method == 'logistic':
+        return _logisticCostFunc(theta, X, y)
+    else:
+        raise ValueError("only 'RSS' and 'Logistic' methods are supported.")
 
 
 def normalEqn(X, y):
@@ -120,7 +187,7 @@ def gradient_descent(X, y, theta, learning_rate, num_iters, cost_func='RSS',
         # Perform a single gradient step on the parameter vector
         prediction = np.dot(X, theta)  # m size vector
         mean_error = prediction - y  # m size vector
-        theta = theta - alpha/m * np.dot(X.T, mean_error)
+        theta = theta - learning_rate/m * np.dot(X.T, mean_error)
 
         # Save the cost J in every iteration
         cost[i] = compute_cost(X, y, theta)
@@ -129,18 +196,32 @@ def gradient_descent(X, y, theta, learning_rate, num_iters, cost_func='RSS',
 
 
 if __name__ == "__main__":
-    train = pd.read_csv('ex1data2.txt',
+
+    # load data
+    train = pd.read_csv('ex2data1.txt',
                         names=['x1', 'x2', 'y'])  # pylint: disable-msg=C0103
     print('train.shape = {0}'.format(train.shape))
     X = train.ix[:, train.columns != 'y'].get_values()
     y = train['y'].get_values()
     print('Shape of X,y = ({0},{1})'.format(X.shape, y.shape))
 
+    # scatter plot of admitted and non-admitted exam scores
+    X_admitted = train.ix[train['y'] == 1, train.columns != 'y'].get_values()
+    X_not_admitted = train.ix[train['y'] == 0,
+                              train.columns != 'y'].get_values()
+    admitted = plt.scatter(X_admitted[:, 0], X_admitted[:, 1],
+                           color='b', marker='+')
+    not_admitted = plt.scatter(X_not_admitted[:, 0], X_not_admitted[:, 1],
+                               color='r', marker='o')
+    plt.xlabel('exam 1 score')
+    plt.ylabel('exam 2 score')
+    plt.legend([admitted, not_admitted], ['admitted', 'Not admitted'])
+    plt.show()
+
     # scale the input to zero mean and standard deviation of 1
     scaler = preprocessing.StandardScaler()
     scaler.fit(X)
     X_scaled = scaler.transform(X)
-
     print(X_scaled[:3, :])
 
     # add intercept term to X_scaled
@@ -148,52 +229,14 @@ if __name__ == "__main__":
     print(X_scaled.shape)
     print(X_scaled[:3, :])
 
-    ##############################################
-    #       Gradient descent                     #
-    ##############################################
+    # Init Theta
+    theta = np.zeros((3, ))
 
-    print('Running gradient descent ...\n')
+    print('cost = {}'.format(compute_cost(theta, X_scaled, y, 'logistic')))
+    print('gradient = {}'.format(compute_gradient(theta, X_scaled, y)))
 
-    # Choose some alpha value
-    alpha = 1
-    num_iters = 50
+    theta_optimized = optimize.fmin_bfgs(_logisticCostFunc, theta,
+                                         fprime=compute_gradient,
+                                         args=(X_scaled, y))
 
-    # Init Theta and Run Gradient Descent
-    theta = np.zeros((3, 1))
-    theta, cost = gradient_descent(X_scaled, y, theta, alpha, num_iters)
-
-    # Plot the convergence graph
-    plt.plot(range(cost.shape[0]), cost)
-    plt.xlabel("Number of iterations")
-    plt.ylabel("Cost J")
-    plt.show()
-
-    # Display gradient descent's result
-    print('Theta computed from gradient descent: {}'.format(theta))
-
-    # Estimate the price of a 1650 sq-ft, 3 br house
-    # Recall that the first column of X is all-ones. Thus, it does
-    # not need to be normalized.
-    X_sample = np.array([1650, 3]).reshape(1, 2)
-    X_sample_scaled = scaler.transform(X_sample)
-    X_sample_scaled = np.concatenate((np.ones((1, 1)),
-                                      X_sample_scaled), axis=1)
-
-    price = np.dot(X_sample_scaled, theta)
-    print('Predicted price of a 1650 sq-ft, 3 br house'
-          'using gradient descent:{}'.format(price))
-
-    ##############################################
-    #        Normal Equation                    ##
-    ##############################################
-
-    print('Running normal equation ...\n')
-
-    # Calculate the parameters from the normal equation
-    theta = normalEqn(X_scaled, y)
-    print('Theta computed from the normal equations: {}'.format(theta))
-
-    # Estimate the price of a 1650 sq-ft, 3 br house
-    price = np.dot(X_sample_scaled, theta)
-    print('Predicted price of a 1650 sq-ft, 3 br house'
-          'using gradient descent:{}'.format(price))
+    print('optimized theta with bfgs= {}'.format(theta_optimized))
