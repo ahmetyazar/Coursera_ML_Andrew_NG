@@ -11,6 +11,7 @@ from scipy import linalg
 from sklearn import preprocessing
 from matplotlib import pyplot as plt
 from scipy import optimize
+from sklearn import metrics
 
 
 def sigmoid(x):
@@ -287,3 +288,20 @@ if __name__ == "__main__":
 
     # plot data wiht a decision boundary
     plotDecisionBoundary(theta_optimized, X_scaled, y)
+
+    # estimate admission probability for a student
+    x_sample = scaler.transform(np.array([45, 85]).reshape(1, -1))
+
+    # add intercept term to X_sample
+    x_sample = np.concatenate((np.ones((1, 1)), x_sample), axis=1)
+    prob = sigmoid(np.dot(x_sample, theta_optimized))
+    print('For a student with scores 45 and 85, we predict an admission '
+          'probability of {}'.format(prob))
+
+    # compute accuracy on our training set
+    prediction = sigmoid(np.dot(X_scaled, theta_optimized)) >= 0.5
+    print('Accuracy is {0}'.format(sum(prediction == y)/y.shape[0]))
+    print('Accuracy is {0}'.format(metrics.accuracy_score(y, prediction)))
+    
+    print('classification report:')
+    print(metrics.classification_report(y, prediction))
