@@ -11,7 +11,6 @@ from scipy import linalg
 from sklearn import preprocessing
 from matplotlib import pyplot as plt
 from scipy import optimize
-from sklearn import metrics
 
 
 def sigmoid(x):
@@ -55,9 +54,9 @@ def _logisticCostFunc(theta, X, y):
     y = y.reshape(-1, 1)
     theta = theta.reshape(-1, 1)
     J = 1/m * (np.dot(-y.T, np.log(sigmoid(np.dot(X, theta)))) -
-               np.dot((1-y.T), np.log(1 - sigmoid(np.dot(X, theta)))))
+               np.dot((1-y).T, np.log(1 - sigmoid(np.dot(X, theta)))))
 
-    return J
+    return np.asscalar(J)
 
 
 
@@ -75,12 +74,9 @@ def compute_gradient(theta, X, y):
         y : ndarray, shape (n_samples,)
             Target values
 
-        method : cost calculation method, default to 'RSS'
-                Only RSS is supported for now
-
         Returns
         -------
-        cost : float
+        gradient : ndarray, shape (n_features,)
     """
     m = len(y)
     y = y.reshape(-1, 1)
@@ -217,7 +213,7 @@ def plotData(X, y, ax1=None):
     plt.legend([admitted, not_admitted], ['admitted', 'Not admitted'])
 
 
-def plotDecisionBoundary(theta, X, y):
+def plotDecisionBoundary(theta, X, y, poly=False):
     """Plots the data points X and y into a new figure with
         the decision boundary defined by theta
 
@@ -231,11 +227,11 @@ def plotDecisionBoundary(theta, X, y):
 
     fig = plt.figure()
     ax1 = fig.add_subplot(111)
-        
-    # Plot Data
-    plotData(X[:,1:3], y, ax1)
 
-    if X.shape[1] <= 3:
+    # Plot Data
+    plotData(X, y, ax1)
+
+    if not poly:
         # Only need 2 points to define a line, so choose two endpoints
         plot_x = np.array([np.min(X[:, 1])-0.1,  np.max(X[:, 1])+0.1])
 
@@ -244,9 +240,35 @@ def plotDecisionBoundary(theta, X, y):
 
         # Plot, and adjust axes for better viewing
         ax1.plot(plot_x, plot_y)
-    
+    else:
+        # Here is the grid range
+        u_orig = np.linspace(-1, 1.5, 50)
+        v_orig = np.linspace(-1, 1.5, 50)
+
+        # create a dataframe with all combinations of u and v
+        u = u_orig.repeat(len(u_orig)).reshape(-1, 1)
+        v = v_orig.reshape(-1, 1).repeat(len(v_orig), axis=1).T.reshape(-1, 1)
+        df = pd.DataFrame(np.concatenate((u, v), axis=1), columns=['c1', 'c2'])
+
+        # create polynomial features
+        poly = polynomial_features(df, columns=['c1', 'c2'], degree=6)
+
+        # add intercept
+        X = np.concatenate((np.ones((len(poly), 1)),
+                            poly.get_values()), axis=1)
+
+        # Evaluate z = theta*x over the grid
+        z = np.dot(X, theta)
+
+        z = z.reshape(len(u_orig), len(v_orig)) #  important to transpose z before calling contour
+
+        # Plot z = 0
+        # Notice you need to specify the range [0, 0]
+        CS = plt.contour(u_orig, v_orig, z)
+        plt.clabel(CS, inline=1, fontsize=10)
+
     plt.show()
-    
+
 
 def polynomial_features(df, columns, degree=2, include_bias=False,
                         copy=True):
@@ -298,6 +320,15 @@ def polynomial_features(df, columns, degree=2, include_bias=False,
 
     return pd.concat((df_output, df_poly), axis=1)
 
+Nfeval = 1
+
+def callbackF(Xi):
+    global Nfeval
+    global X_scaled, y
+    g = compute_gradient(Xi, X_scaled, y)
+    print ('{0:4d}   {1: 3.6f}   {2: 3.6f}   {3: 3.6f}   {4: 3.6f}'.format(Nfeval,
+           _logisticCostFunc(Xi, X_scaled, y), g[0], g[1], g[2]))
+    Nfeval += 1
 
 if __name__ == "__main__":
 
@@ -317,13 +348,17 @@ if __name__ == "__main__":
                                      ['x1', 'x2'], degree=6)
 
     # scale the input to zero mean and standard deviation of 1
-    scaler = preprocessing.StandardScaler()
-    scaler.fit(train_poly.get_values())
-    X_scaled = scaler.transform(train_poly.get_values())
+    # scaler = preprocessing.StandardScaler()
+    # scaler.fit(train_poly.get_values())
+    # X_scaled = scaler.transform(train_poly.get_values())
 
+    # commented out scaling. It creates very small values causing issues with 
+    # minimization
+    X_scaled = train_poly.get_values()
+    
     # add intercept term to X_scaled
     X_scaled = np.concatenate((np.ones((X.shape[0], 1)),
-                                        X_scaled), axis=1)
+                               X_scaled), axis=1)
     print('Shape of X_scaled: {0}'.format(X_scaled.shape))
 
     # Init Theta
@@ -332,17 +367,20 @@ if __name__ == "__main__":
     print('cost = {}'.format(compute_cost(theta, X_scaled, y, 'logistic')))
     print('gradient = {}'.format(compute_gradient(theta, X_scaled, y)))
 
-    theta_optimized = optimize.fmin_bfgs(_logisticCostFunc, theta,
+    [xopt, fopt, gopt, Bopt, func_calls, grad_calls, 
+     warnflg]  = optimize.fmin_bfgs(_logisticCostFunc, theta,
                                          fprime=compute_gradient,
-                                         args=(X_scaled, y))
+                                         args=(X_scaled, y), 
+                                         callback=callbackF, 
+                                         maxiter=2000, 
+                                         full_output=True, 
+                                         retall=False)
 
-    print('optimized theta with bfgs= {}'.format(theta_optimized))
+    print('optimized theta with bfgs= {}'.format(xopt))
 
     # calculate minimum cost
-    print('minimum cost: {0}'.format(
-            _logisticCostFunc(theta_optimized, X_scaled, y)))
+    # print('minimum cost: {0}'.format(
+    #        _logisticCostFunc(theta_optimized, X_scaled, y)))
 
     # plot data wiht a decision boundary
-    # plotDecisionBoundary(theta_optimized, X_scaled, y)
-
-
+    plotDecisionBoundary(xopt, X, y, poly=True)
