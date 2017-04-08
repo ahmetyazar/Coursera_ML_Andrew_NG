@@ -352,7 +352,7 @@ if __name__ == "__main__":
     # scaler.fit(train_poly.get_values())
     # X_scaled = scaler.transform(train_poly.get_values())
 
-    # commented out scaling. It creates very small values causing issues with 
+    # commented out scaling. It creates very small values causing issues with
     # minimization
     X_scaled = train_poly.get_values()
     
@@ -367,20 +367,25 @@ if __name__ == "__main__":
     print('cost = {}'.format(compute_cost(theta, X_scaled, y, 'logistic')))
     print('gradient = {}'.format(compute_gradient(theta, X_scaled, y)))
 
-    [xopt, fopt, gopt, Bopt, func_calls, grad_calls, 
-     warnflg]  = optimize.fmin_bfgs(_logisticCostFunc, theta,
-                                         fprime=compute_gradient,
-                                         args=(X_scaled, y), 
-                                         callback=callbackF, 
-                                         maxiter=2000, 
-                                         full_output=True, 
-                                         retall=False)
-
-    print('optimized theta with bfgs= {}'.format(xopt))
+    # [xopt, fopt, gopt, Bopt, func_calls, grad_calls, 
+    #  warnflg]  = optimize.fmin_bfgs(_logisticCostFunc, theta,
+    #                                     fprime=compute_gradient,
+    #                                     args=(X_scaled, y), 
+    #                                     callback=callbackF, 
+    #                                     maxiter=2000, 
+    #                                     full_output=True, 
+    #                                     retall=False)
+    
+    xopt = optimize.minimize(_logisticCostFunc, theta, # method='Powell',
+                   jac=compute_gradient, args=(X_scaled, y),
+                   callback=callbackF,
+                   options={'gtol': 1e-6, 'disp': True})
+    
+    print('optimized theta with bfgs= {}'.format(xopt.x))
 
     # calculate minimum cost
     # print('minimum cost: {0}'.format(
     #        _logisticCostFunc(theta_optimized, X_scaled, y)))
 
     # plot data wiht a decision boundary
-    plotDecisionBoundary(xopt, X, y, poly=True)
+    plotDecisionBoundary(xopt.x, X, y, poly=True)
