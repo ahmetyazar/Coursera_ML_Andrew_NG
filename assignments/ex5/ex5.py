@@ -223,6 +223,7 @@ if __name__ == "__main__":
     #  lambda to see how the fit and learning curve change.
     #
    
+    print('lambda = 1\n')
     reg = 1
     initial_theta = np.zeros((X_poly.shape[1],))
     xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
@@ -235,17 +236,21 @@ if __name__ == "__main__":
     ax3.scatter(raw['X'], y, c='r', marker='x', linewidths=1.5)
     
     # plot polynomial fit
-    #x_plt = np.array(np.arange(min(raw['X'])-15, max(raw['X'])+25, 0.05))
-    #x_plt_poly = poly.fit_transform(x_plt)
-    #x_plt_poly = scaler.transform(x_plt_poly)
-    #x_plt_poly = np.concatenate((np.ones((len(x_plt_poly), 1)), x_plt_poly), 
-    #                            axis=1)
-                                   
-#    ax4 = fig2.add_subplot(111)
-#    ax4.plot(raw['X'], np.dot(x_plt_poly, xopt.x).ravel(),
-#             c='r', marker='x', linewidths=1.5)
-#    plt.xlabel('Change in water level (x)')
-#    plt.ylabel('Water flowing out of the dam (y)')
-#    plt.title(print('Polynomial Regression Fit (lambda = {0:1.2f})', reg))
+    x_plt = np.array(np.arange(min(raw['X'])-15,
+                               max(raw['X'])+25, 0.05)).reshape(-1,1)
+    print(x_plt.shape)
+    x_plt_poly = poly.fit_transform(x_plt)
+    print(x_plt_poly.shape)
+    x_plt_poly = scaler.transform(x_plt_poly)
+    print(x_plt_poly.shape)
+    x_plt_poly = np.concatenate((np.ones((len(x_plt_poly), 1)), x_plt_poly), 
+                                axis=1)
+    print(x_plt_poly.shape)         
+    print(xopt.x.shape)                  
+    ax4 = fig2.add_subplot(111)
+    ax4.plot(x_plt, np.dot(x_plt_poly, xopt.x))
+    plt.xlabel('Change in water level (x)')
+    plt.ylabel('Water flowing out of the dam (y)')
+    plt.title('Polynomial Regression Fit (lambda = {0:1.2f})'.format(reg))
 
 
