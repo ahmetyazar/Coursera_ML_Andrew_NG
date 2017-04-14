@@ -67,34 +67,14 @@ def learningCurve(X, y, Xval, yval, reg=0):
     %   datasets, you might want to do this in larger intervals.
     """
 
-    # Number of training examples
-    m = len(X)
-
     # You need to return these values correctly
-    error_train = np.zeros((m, 1))
-    error_val = np.zeros((m, 1))
+    error_train = np.zeros((len(X), 1))
+    error_val = np.zeros((len(Xval), 1))
 
-# ====================== YOUR CODE HERE ======================
-# Instructions: Fill in this function to return training errors in
-#               error_train and the cross validation errors in error_val.
-#               i.e., error_train(i) and
-#               error_val(i) should give you the errors
-#               obtained after training on i examples.
-#
-# Note: You should evaluate the training error on the first i training
-#       examples (i.e., X(1:i, :) and y(1:i)).
-#
-#       For the cross-validation error, you should instead evaluate on
-#       the _entire_ cross validation set (Xval and yval).
-#
-# Note: If you are using your cost function (linearRegCostFunction)
-#       to compute the training and cross validation error, you should
-#       call the function with the lambda argument set to 0.
-#       Do note that you will still need to use lambda when running
-#       the training to obtain the theta parameters.
+    initial_theta = np.zeros((X.shape[1],))
 
     for i in range(m):
-        xopt = optimize.minimize(computeRSS, theta, method='BFGS',
+        xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
                                  jac=computeGradient, args=(X[:i+1, :],
                                                             y[:i+1], reg),
                                  options={'gtol': 1e-6, 'disp': False})
@@ -102,6 +82,70 @@ def learningCurve(X, y, Xval, yval, reg=0):
         error_val[i] = computeRSS(xopt.x, Xval, yval, 0)
 
     return error_train, error_val
+
+
+def learningCurveWithShuffle(X, y, Xval, yval, reg=0, samplingSize=50):
+    """ LEARNINGCURVE Generates the train and cross validation set errors needed
+    %to plot a learning curve
+    %   [error_train, error_val] = ...
+    %       LEARNINGCURVE(X, y, Xval, yval, lambda) returns the train and
+    %       cross validation set errors for a learning curve. In particular,
+    %       it returns two vectors of the same length - error_train and
+    %       error_val. Then, error_train(i) contains the training error for
+    %       i examples (and similarly for error_val(i)).
+    %
+    %   In this function, you will compute the train and test errors for
+    %   dataset sizes from 1 up to m. In practice, when working with larger
+    %   datasets, you might want to do this in larger intervals.
+    """
+
+    # You need to return these values correctly
+    error_train = np.zeros((len(X), 1))
+    error_val = np.zeros((len(Xval), 1))
+
+    initial_theta = np.zeros((X.shape[1],))
+
+    for i in range(m):
+        for j in range(samplingSize):
+            index = np.random.choice(len(X), size=samplingSize+1)
+            xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
+                                     jac=computeGradient, args=(X[index, :],
+                                                                y[index], reg),
+                                     options={'gtol': 1e-6, 'disp': False})
+            error_train[i] += computeRSS(xopt.x, X[index, :], y[index], 0)
+        
+        error_train[i] = error_train[i] / samplingSize
+        error_val[i] = computeRSS(xopt.x, Xval, yval, 0)
+
+    return error_train, error_val
+
+
+def validationCurve(X, y, Xval, yval):
+    """ VALIDATIONCURVE Generate the train and validation errors needed to
+        plot a validation curve that we can use to select lambda
+        %   [lambda_vec, error_train, error_val] = ...
+        %       VALIDATIONCURVE(X, y, Xval, yval) returns the train
+        %       and validation errors (in error_train, error_val)
+        %       for different values of lambda. You are given the training 
+        set (X, y) and validation set (Xval, yval).
+     """
+
+    # Selected values of lambda
+    lambda_vec = np.array([0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10])
+
+    # You need to return these variables correctly.
+    error_train = np.zeros((len(lambda_vec), 1))
+    error_val = np.zeros((len(lambda_vec), 1))
+
+    initial_theta = np.zeros((X.shape[1],))
+    for i in range(len(lambda_vec)):
+        xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
+                             jac=computeGradient, args=(X, y, lambda_vec[i]),
+                             options={'gtol': 1e-6, 'disp': False})
+        error_train[i] = xopt.fun
+        error_val[i] = computeRSS(xopt.x, Xval, yval, lambda_vec[i])
+    
+    return lambda_vec, error_train, error_val
 
 
 if __name__ == "__main__":
@@ -169,10 +213,11 @@ if __name__ == "__main__":
     fig1 = plt.figure()
     ax2 = fig1.add_subplot(111)
     ax2.plot(np.array(range(m))+1, error_train,
-             np.array(range(m))+1, error_val)
+             np.array(range(len(Xval)))+1, error_val)
     plt.title('Learning curve for linear regression')
     ax2.legend(['Train', 'Cross Validation'])
     plt.xlabel('Number of training examples')
+    plt.xticks(np.arange(1,max((len(X),len(Xval)))+1,2))
     plt.ylabel('Error')
 
     print('# Training Examples\tTrain Error\tCross Validation Error\n')
@@ -253,4 +298,88 @@ if __name__ == "__main__":
     plt.ylabel('Water flowing out of the dam (y)')
     plt.title('Polynomial Regression Fit (lambda = {0:1.2f})'.format(reg))
 
+    # Learning curve for polynomial regression
+    error_train, error_val = learningCurve(X_poly, y, X_poly_val, yval, reg)
+
+    fig3 = plt.figure()
+    ax5 = fig3.add_subplot(111)
+    ax5.plot(np.arange(len(X_poly))+1, error_train,
+             np.arange(len(X_poly_val))+1, error_val)
+    plt.title('Learning curve for polynomial regression with '
+              'lambda {0}'.format(reg))
+    ax5.legend(['Train', 'Cross Validation'])
+    plt.xlabel('Number of training examples')
+    plt.xticks(np.arange(1,max((len(X_poly),len(X_poly_val)))+1,2))
+    plt.ylabel('Error')
+
+    print('# Training Examples\tTrain Error\tCross Validation Error\n')
+    for i in range(m):
+        print('  \t{0}\t{1:3.4f}\t{2:3.4f}'.format(i+1,
+              np.asscalar(error_train[i]), np.asscalar(error_val[i])))
+
+
+    print('\n##########################################################')
+    print('Validation for Selecting Lambda\n')
+    # test various values of lambda on a validation set and 
+    # use this to select the "best" lambda value.
+
+    lambda_vec, error_train, error_val = validationCurve(X_poly, y,
+                                                         X_poly_val, yval)
+    fig4 = plt.figure()
+    ax6 = fig4.add_subplot(111)
+    ax6.plot(lambda_vec, error_train, lambda_vec, error_val)
+    ax6.legend(['Train', 'Cross Validation'])
+    plt.title('Validation for Selecting Lambda')
+    # plt.xticks(lambda_vec)
+    plt.xlabel('lambda')
+    plt.ylabel('Error')
+    
+    print('lambda\tTrain Error\tValidation Error\n')
+    for i in range(len(lambda_vec)):
+        	print(' {0}\t{1:3.5f}\t\t{2:3.5f}\n'.format(lambda_vec[i],
+               np.asscalar(error_train[i]), np.asscalar(error_val[i])))
+ 
+    print('\n##########################################################')
+    print('Compute the test error using the best value of λ\n')  
+    best_lambda = 0.3   
+    initial_theta = np.zeros((X_poly.shape[1],))
+    xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
+                             jac=computeGradient,
+                             args=(X_poly, y, best_lambda),
+                             options={'gtol': 1e-6, 'disp': False})
+    test_error = computeRSS(xopt.x, X_poly_test, ytest, best_lambda)
+    print('For lambda={0}, test error is {1:3.5f}'.format(best_lambda,
+          test_error))
+    
+    print('\n##########################################################')
+    print('Learning curves with randomly selected examples\n')     
+    # In practice, especially for small training sets, when you plot learning curves
+    # to debug your algorithms, it is often helpful to average across multiple sets
+    # of randomly selected examples to determine the training error and cross
+    # validation error.
+    
+    # Learning curve for polynomial regression
+    reg = 0.01
+    averagingSize = 50
+    error_train, error_val = learningCurveWithShuffle(X_poly, y, 
+                                                      X_poly_val, yval, 
+                                                      reg, averagingSize)
+
+    fig5 = plt.figure()
+    ax7 = fig5.add_subplot(111)
+    ax7.plot(np.arange(len(X_poly))+1, error_train,
+             np.arange(len(X_poly_val))+1, error_val)
+    plt.title('Learning curve for polynomial regression with '
+              'lambda {0} using averaging of 50 samples'.format(reg))
+    ax7.legend(['Train', 'Cross Validation'])
+    plt.xlabel('Number of training examples')
+    plt.xticks(np.arange(1,max((len(X_poly),len(X_poly_val)))+1,2))
+    plt.ylabel('Error')
+
+    print('# Training Examples\tTrain Error\tCross Validation Error\n')
+    for i in range(m):
+        print('  \t{0}\t{1:3.4f}\t{2:3.4f}'.format(i+1,
+              np.asscalar(error_train[i]), np.asscalar(error_val[i])))
+    
+    
 
