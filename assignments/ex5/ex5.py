@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from scipy.io import loadmat
 from matplotlib import pyplot as plt
 from scipy import optimize
@@ -107,15 +106,17 @@ def learningCurveWithShuffle(X, y, Xval, yval, reg=0, samplingSize=50):
 
     for i in range(m):
         for j in range(samplingSize):
-            index = np.random.choice(len(X), size=samplingSize+1)
+            train_idx = np.random.choice(len(X), size=j+1)
+            cv_idx = np.random.choice(len(Xval), size=j+1)
             xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
-                                     jac=computeGradient, args=(X[index, :],
-                                                                y[index], reg),
+                                     jac=computeGradient, 
+                                     args=(X[train_idx, :], y[train_idx], reg),
                                      options={'gtol': 1e-6, 'disp': False})
-            error_train[i] += computeRSS(xopt.x, X[index, :], y[index], 0)
+            error_train[i] += computeRSS(xopt.x, X[train_idx, :], y[train_idx], 0)
+            error_val[i] += computeRSS(xopt.x, Xval[cv_idx, :], yval[cv_idx], 0)
         
         error_train[i] = error_train[i] / samplingSize
-        error_val[i] = computeRSS(xopt.x, Xval, yval, 0)
+        error_val[i] = error_val[i] / samplingSize
 
     return error_train, error_val
 
@@ -213,11 +214,11 @@ if __name__ == "__main__":
     fig1 = plt.figure()
     ax2 = fig1.add_subplot(111)
     ax2.plot(np.array(range(m))+1, error_train,
-             np.array(range(len(Xval)))+1, error_val)
+             np.array(range(m))+1, error_val[:m])
     plt.title('Learning curve for linear regression')
     ax2.legend(['Train', 'Cross Validation'])
     plt.xlabel('Number of training examples')
-    plt.xticks(np.arange(1,max((len(X),len(Xval)))+1,2))
+    plt.xticks(np.arange(1,m+1,2))
     plt.ylabel('Error')
 
     print('# Training Examples\tTrain Error\tCross Validation Error\n')
@@ -261,7 +262,65 @@ if __name__ == "__main__":
     print(X_poly_val[0, :])
     
     print('\n##########################################################')
-    print('LEARNING CURVE POLYNOMIAL REGRESSION\n')
+    print('LEARNING CURVE POLYNOMIAL REGRESSION WITH LAMBDA = 0\n')
+    #  Now, you will get to experiment with polynomial regression with multiple
+    #  values of lambda. The code below runs polynomial regression with 
+    #  lambda = 0. You should try running the code with different values of
+    #  lambda to see how the fit and learning curve change.
+    #
+   
+    print('lambda = 0\n')
+    reg = 0
+    initial_theta = np.zeros((X_poly.shape[1],))
+    xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
+                             jac=computeGradient, args=(X_poly, y, reg),
+                             options={'gtol': 1e-6, 'disp': False})
+
+    # Plot training data and fit
+    fig2 = plt.figure()
+    ax3 = fig2.add_subplot(111)
+    ax3.scatter(raw['X'], y, c='r', marker='x', linewidths=1.5)
+    
+    # plot polynomial fit
+    x_plt = np.array(np.arange(min(raw['X'])-15,
+                               max(raw['X'])+25, 0.05)).reshape(-1,1)
+    print(x_plt.shape)
+    x_plt_poly = poly.fit_transform(x_plt)
+    print(x_plt_poly.shape)
+    x_plt_poly = scaler.transform(x_plt_poly)
+    print(x_plt_poly.shape)
+    x_plt_poly = np.concatenate((np.ones((len(x_plt_poly), 1)), x_plt_poly), 
+                                axis=1)
+    print(x_plt_poly.shape)         
+    print(xopt.x.shape)                  
+    ax4 = fig2.add_subplot(111)
+    ax4.plot(x_plt, np.dot(x_plt_poly, xopt.x))
+    plt.xlabel('Change in water level (x)')
+    plt.ylabel('Water flowing out of the dam (y)')
+    plt.title('Polynomial Regression Fit (lambda = {0:1.2f})'.format(reg))
+
+    # Learning curve for polynomial regression
+    error_train, error_val = learningCurve(X_poly, y, X_poly_val, yval, reg)
+
+    fig3 = plt.figure()
+    ax5 = fig3.add_subplot(111)
+    ax5.plot(np.arange(len(X_poly))+1, error_train,
+             np.arange(len(X_poly))+1, error_val[:len(X_poly)])
+    plt.title('Learning curve for polynomial regression with '
+              'lambda {0}'.format(reg))
+    ax5.legend(['Train', 'Cross Validation'])
+    plt.xlabel('Number of training examples')
+    # plt.xticks(np.arange(1,m+1,2))
+    plt.ylabel('Error')
+
+    print('# Training Examples\tTrain Error\tCross Validation Error\n')
+    for i in range(m):
+        print('  \t{0}\t{1:3.4f}\t{2:3.4f}'.format(i+1,
+              np.asscalar(error_train[i]), np.asscalar(error_val[i])))
+
+   
+    print('\n##########################################################')
+    print('LEARNING CURVE POLYNOMIAL REGRESSION WITH LAMBDA = 1\n')
     #  Now, you will get to experiment with polynomial regression with multiple
     #  values of lambda. The code below runs polynomial regression with 
     #  lambda = 0. You should try running the code with different values of
@@ -304,18 +363,19 @@ if __name__ == "__main__":
     fig3 = plt.figure()
     ax5 = fig3.add_subplot(111)
     ax5.plot(np.arange(len(X_poly))+1, error_train,
-             np.arange(len(X_poly_val))+1, error_val)
+             np.arange(len(X_poly))+1, error_val[:len(X_poly)])
     plt.title('Learning curve for polynomial regression with '
               'lambda {0}'.format(reg))
     ax5.legend(['Train', 'Cross Validation'])
     plt.xlabel('Number of training examples')
-    plt.xticks(np.arange(1,max((len(X_poly),len(X_poly_val)))+1,2))
+    # plt.xticks(np.arange(1,m+1,2))
     plt.ylabel('Error')
 
     print('# Training Examples\tTrain Error\tCross Validation Error\n')
     for i in range(m):
         print('  \t{0}\t{1:3.4f}\t{2:3.4f}'.format(i+1,
               np.asscalar(error_train[i]), np.asscalar(error_val[i])))
+
 
 
     print('\n##########################################################')
@@ -341,7 +401,7 @@ if __name__ == "__main__":
  
     print('\n##########################################################')
     print('Compute the test error using the best value of λ\n')  
-    best_lambda = 0.3   
+    best_lambda = 0.3  
     initial_theta = np.zeros((X_poly.shape[1],))
     xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
                              jac=computeGradient,
@@ -350,6 +410,88 @@ if __name__ == "__main__":
     test_error = computeRSS(xopt.x, X_poly_test, ytest, best_lambda)
     print('For lambda={0}, test error is {1:3.5f}'.format(best_lambda,
           test_error))
+ 
+    best_lambda = 1
+    initial_theta = np.zeros((X_poly.shape[1],))
+    xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
+                             jac=computeGradient,
+                             args=(X_poly, y, best_lambda),
+                             options={'gtol': 1e-6, 'disp': False})
+    test_error = computeRSS(xopt.x, X_poly_test, ytest, best_lambda)
+    print('For lambda={0}, test error is {1:3.5f}'.format(best_lambda,
+          test_error))
+  
+    best_lambda = 3
+    initial_theta = np.zeros((X_poly.shape[1],))
+    xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
+                             jac=computeGradient,
+                             args=(X_poly, y, best_lambda),
+                             options={'gtol': 1e-6, 'disp': False})
+    test_error = computeRSS(xopt.x, X_poly_test, ytest, best_lambda)
+    print('For lambda={0}, test error is {1:3.5f}'.format(best_lambda,
+          test_error))   
+    
+    
+    
+    print('\n##########################################################')
+    print('LEARNING CURVE POLYNOMIAL REGRESSION WITH LAMBDA = 0.3\n')
+    #  Now, you will get to experiment with polynomial regression with multiple
+    #  values of lambda. The code below runs polynomial regression with 
+    #  lambda = 0. You should try running the code with different values of
+    #  lambda to see how the fit and learning curve change.
+    #
+   
+    print('lambda = 0.3\n')
+    reg = 0.3
+    initial_theta = np.zeros((X_poly.shape[1],))
+    xopt = optimize.minimize(computeRSS, initial_theta, method='BFGS',
+                             jac=computeGradient, args=(X_poly, y, reg),
+                             options={'gtol': 1e-6, 'disp': False})
+
+    # Plot training data and fit
+    fig2 = plt.figure()
+    ax3 = fig2.add_subplot(111)
+    ax3.scatter(raw['X'], y, c='r', marker='x', linewidths=1.5)
+    
+    # plot polynomial fit
+    x_plt = np.array(np.arange(min(raw['X'])-15,
+                               max(raw['X'])+25, 0.05)).reshape(-1,1)
+    print(x_plt.shape)
+    x_plt_poly = poly.fit_transform(x_plt)
+    print(x_plt_poly.shape)
+    x_plt_poly = scaler.transform(x_plt_poly)
+    print(x_plt_poly.shape)
+    x_plt_poly = np.concatenate((np.ones((len(x_plt_poly), 1)), x_plt_poly), 
+                                axis=1)
+    print(x_plt_poly.shape)         
+    print(xopt.x.shape)                  
+    ax4 = fig2.add_subplot(111)
+    ax4.plot(x_plt, np.dot(x_plt_poly, xopt.x))
+    plt.xlabel('Change in water level (x)')
+    plt.ylabel('Water flowing out of the dam (y)')
+    plt.title('Polynomial Regression Fit (lambda = {0:1.2f})'.format(reg))
+
+    # Learning curve for polynomial regression
+    error_train, error_val = learningCurve(X_poly, y, X_poly_val, yval, reg)
+
+    fig3 = plt.figure()
+    ax5 = fig3.add_subplot(111)
+    ax5.plot(np.arange(len(X_poly))+1, error_train,
+             np.arange(len(X_poly))+1, error_val[:len(X_poly)])
+    plt.title('Learning curve for polynomial regression with '
+              'lambda {0}'.format(reg))
+    ax5.legend(['Train', 'Cross Validation'])
+    plt.xlabel('Number of training examples')
+    # plt.xticks(np.arange(1,m+1,2))
+    plt.ylabel('Error')
+
+    print('# Training Examples\tTrain Error\tCross Validation Error\n')
+    for i in range(m):
+        print('  \t{0}\t{1:3.4f}\t{2:3.4f}'.format(i+1,
+              np.asscalar(error_train[i]), np.asscalar(error_val[i])))
+
+
+    
     
     print('\n##########################################################')
     print('Learning curves with randomly selected examples\n')     
@@ -359,7 +501,7 @@ if __name__ == "__main__":
     # validation error.
     
     # Learning curve for polynomial regression
-    reg = 0.01
+    reg = 3
     averagingSize = 50
     error_train, error_val = learningCurveWithShuffle(X_poly, y, 
                                                       X_poly_val, yval, 
@@ -368,12 +510,12 @@ if __name__ == "__main__":
     fig5 = plt.figure()
     ax7 = fig5.add_subplot(111)
     ax7.plot(np.arange(len(X_poly))+1, error_train,
-             np.arange(len(X_poly_val))+1, error_val)
+             np.arange(len(X_poly))+1, error_val[:len(X_poly)])
     plt.title('Learning curve for polynomial regression with '
               'lambda {0} using averaging of 50 samples'.format(reg))
     ax7.legend(['Train', 'Cross Validation'])
     plt.xlabel('Number of training examples')
-    plt.xticks(np.arange(1,max((len(X_poly),len(X_poly_val)))+1,2))
+    # plt.xticks(np.arange(1,len(X_poly)+1,2))
     plt.ylabel('Error')
 
     print('# Training Examples\tTrain Error\tCross Validation Error\n')
@@ -382,4 +524,48 @@ if __name__ == "__main__":
               np.asscalar(error_train[i]), np.asscalar(error_val[i])))
     
     
+    reg = 1
+    averagingSize = 50
+    error_train, error_val = learningCurveWithShuffle(X_poly, y, 
+                                                      X_poly_val, yval, 
+                                                      reg, averagingSize)
 
+    fig5 = plt.figure()
+    ax7 = fig5.add_subplot(111)
+    ax7.plot(np.arange(len(X_poly))+1, error_train,
+             np.arange(len(X_poly))+1, error_val[:len(X_poly)])
+    plt.title('Learning curve for polynomial regression with '
+              'lambda {0} using averaging of 50 samples'.format(reg))
+    ax7.legend(['Train', 'Cross Validation'])
+    plt.xlabel('Number of training examples')
+    # plt.xticks(np.arange(1,len(X_poly)+1,2))
+    plt.ylabel('Error')
+
+    print('# Training Examples\tTrain Error\tCross Validation Error\n')
+    for i in range(m):
+        print('  \t{0}\t{1:3.4f}\t{2:3.4f}'.format(i+1,
+              np.asscalar(error_train[i]), np.asscalar(error_val[i])))
+    
+
+    reg = 0.03
+    averagingSize = 50
+    error_train, error_val = learningCurveWithShuffle(X_poly, y, 
+                                                      X_poly_val, yval, 
+                                                      reg, averagingSize)
+
+    fig5 = plt.figure()
+    ax7 = fig5.add_subplot(111)
+    ax7.plot(np.arange(len(X_poly))+1, error_train,
+             np.arange(len(X_poly))+1, error_val[:len(X_poly)])
+    plt.title('Learning curve for polynomial regression with '
+              'lambda {0} using averaging of 50 samples'.format(reg))
+    ax7.legend(['Train', 'Cross Validation'])
+    plt.xlabel('Number of training examples')
+    # plt.xticks(np.arange(1,len(X_poly)+1,2))
+    plt.ylabel('Error')
+
+    print('# Training Examples\tTrain Error\tCross Validation Error\n')
+    for i in range(m):
+        print('  \t{0}\t{1:3.4f}\t{2:3.4f}'.format(i+1,
+              np.asscalar(error_train[i]), np.asscalar(error_val[i])))
+    
